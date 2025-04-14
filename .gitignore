@@ -7,3 +7,9 @@ venv/
 # Python cache
 __pycache__/
 *.py[cod] 
+
+# cursor 
+.cursor/
+
+# vscode
+.vscode/
