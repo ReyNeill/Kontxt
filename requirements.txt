@@ -1,0 +1,8 @@
+mcp
+google-generativeai
+python-dotenv
+aiofiles
+fastapi
+uvicorn
+sse-starlette
+transformers 
