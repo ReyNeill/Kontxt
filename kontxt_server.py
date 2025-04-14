@@ -433,19 +433,20 @@ class KontxtMcpServer:
             """Analyzes the configured codebase using AI (Gemini) based on your query and returns relevant context/documentation.
             
             Args:
-                request: Dictionary containing the query and optional parameters
+                request: Dictionary with the following structure:
                     {
-                        "query": "The user's question or request",
-                        "referred_files": {"filename": "location", ...} (optional),
-                        "extra_info": "Additional context or information to include" (optional)
+                        "request": {
+                            "query": "The user's question or request",
+                            "referred_files": {"filename": "location", ...} (optional),
+                            "extra_info": "Additional context or information to include" (optional)
+                        }
                     }
             
             Usage Notes:
-                - "query" is the only required parameter
-                - "referred_files" should contain filenames as keys and (optionally) their locations as values
-                  DO NOT include file contents in this parameter. Files will be mentioned but NOT automatically read.
-                - "extra_info" can contain any additional context like documentation, file contents,
-                  terminal output, git diffs, etc. that may help answer the query
+                - The outermost object must have a 'request' key.
+                - 'query' is the only required parameter inside 'request'.
+                - 'referred_files' should contain filenames as keys and (optionally) their locations as values. DO NOT include file contents in this parameter. Files will be mentioned but NOT automatically read.
+                - 'extra_info' can contain any additional context like documentation, file contents, terminal output, git diffs, etc. that may help answer the query
             """
             request_id = str(uuid.uuid4())[:8]  # generates a short request ID for tracking
             

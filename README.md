@@ -78,6 +78,8 @@ Once your server is running, you can connect Cursor to it by editing your `~/.cu
 }
 ```
 
+PS: remember to always refresh the MCP server on Cursor Settings or other client to connect to the MCP via sse
+
 ## Alternative: Running with stdio Transport
 
 If you prefer to have the client start and manage the server process:
