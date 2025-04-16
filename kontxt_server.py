@@ -343,8 +343,8 @@ class KontxtMcpServer:
         others = []
         for root, dirs, files in os.walk(self.repo_path):
             rel_root = os.path.relpath(root, self.repo_path)
-            # skip common build/dependency dirs
-            if any(part in rel_root for part in ['.git', 'venv', '__pycache__', 'node_modules', 'dist', 'build']):
+            # skip common build/dependency/generated dirs
+            if any(part in rel_root for part in ['.git', 'venv', '__pycache__', 'node_modules', 'dist', 'build', '.next']):
                 continue
             for f in files:
                 rel_path = os.path.relpath(os.path.join(root, f), self.repo_path)
