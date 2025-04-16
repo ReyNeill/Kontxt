@@ -11,7 +11,7 @@ A Model Context Protocol (MCP) server that tries to solve condebase indexing (un
 - Supports both SSE (recommended) and stdio transport protocols.
 - Supports user-attached files/docs/context from client's queries for more targeted analysis.
 - Tracks token usage and provides detailed analysis of API consumption.
-- Maxes out possible context tokens for the best index summary.
+- User-configurable token limit for context generation (options: 500k, 800k, or 1M tokens; default: 800k).
 
 ## Setup
 
@@ -109,7 +109,10 @@ For this mode, configure your `~/.cursor/mcp.json` file like this:
 
 - `--repo-path PATH`: **Required**. Absolute path to the local code repository to analyze.
 - `--gemini-api-key KEY`: Google Gemini API Key (overrides `.env` if provided).
-- `--token-threshold NUM`: Target maximum token count for the context (default: 800000).
+- `--token-threshold NUM`: Target maximum token count for the context. Allowed values are:
+  - 500000
+  - 800000 (default)
+  - 1000000
 - `--gemini-model NAME`: Specific Gemini model to use (default: 'gemini-2.0-flash').
 - `--transport {stdio,sse}`: Transport protocol to use (default: sse).
 - `--host HOST`: Host address for the SSE server (default: 127.0.0.1).
