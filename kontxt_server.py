@@ -139,10 +139,18 @@ def parse_arguments():
                         help="Absolute path to the local code repository to analyze.")
     parser.add_argument("--gemini-api-key", type=str, default=None,
                         help="Google Gemini API Key (overrides .env file if provided).")
-    parser.add_argument("--token-threshold", type=int, default=800000,
-                        help="Target maximum token count for the generated context (default: 800000).")
-    parser.add_argument("--gemini-model", type=str, default='gemini-2.0-flash',
-                        help="The specific Gemini model to use (default: 'gemini-2.0-flash').")
+    parser.add_argument(
+        "--token-threshold",
+        type=int,
+        choices=[500000, 800000, 1000000],
+        default=800000,
+        help=(
+            "Target maximum token count for the generated context. "
+            "Allowed values: 500000, 800000 (default), 1000000."
+        )
+    )
+    parser.add_argument("--gemini-model", type=str, default='models/gemini-2.5-flash-preview-04-17',
+                        help="The specific Gemini model to use (default: 'models/gemini-2.5-flash-preview-04-17').")
     # host and port for SSE server
     parser.add_argument("--host", type=str, default="127.0.0.1", help="host for the SSE server (default: 127.0.0.1).")
     parser.add_argument("--port", type=int, default=8080, help="port for the SSE server (default: 8080).")
