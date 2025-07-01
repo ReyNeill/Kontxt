@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/reyneill-kontxt-badge.png)](https://mseep.ai/app/reyneill-kontxt)
+
 # Kontxt MCP Server
 
 A Model Context Protocol (MCP) server that tries to solve condebase indexing (until agents can).
