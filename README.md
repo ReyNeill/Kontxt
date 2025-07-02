@@ -1,5 +1,3 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/reyneill-kontxt-badge.png)](https://mseep.ai/app/reyneill-kontxt)
-
 # Kontxt MCP Server
 
 A Model Context Protocol (MCP) server that tries to solve condebase indexing (until agents can).
@@ -154,3 +152,9 @@ The server tracks token usage across different operations:
 This information is logged during operation, helping you monitor API usage and optimize your queries.
 
 PD: want the tool to improve? PR's are open.
+
+
+### Marketplace badges
+
+[![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/61b0cc9b-59e5-4fd6-8bf8-aa164f5d0006)
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/reyneill-kontxt-badge.png)](https://mseep.ai/app/reyneill-kontxt)
