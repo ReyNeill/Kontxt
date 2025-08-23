@@ -122,6 +122,29 @@ For this mode, configure your `~/.cursor/mcp.json` file like this:
 - `--transport {stdio,sse}`: Transport protocol to use (default: sse).
 - `--host HOST`: Host address for the SSE server (default: 127.0.0.1).
 - `--port PORT`: Port for the SSE server (default: 8080).
+- `--cors-origins ORIGINS`: Comma-separated list of allowed CORS origins. If omitted, defaults to loopback only.
+- `--cors-credentials`: Allow credentials for CORS (disabled by default).
+
+### CORS Configuration
+
+For security, wildcard CORS is not used. By default, only loopback origins are allowed:
+
+- `http://127.0.0.1`, `http://localhost`, and the bound `host:port`.
+
+To allow specific web clients during development, pass explicit origins or use an env var:
+
+```bash
+python kontxt_server.py \
+  --repo-path /path/to/your/codebase \
+  --cors-origins http://localhost:3000,http://127.0.0.1:5173
+
+# or via environment variable
+KONTXT_CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:5173" \
+python kontxt_server.py --repo-path /path/to/your/codebase
+```
+
+Notes:
+- Allowed methods: `GET`, `OPTIONS`. Headers: all. Credentials: off unless `--cors-credentials` is set.
 
 ### Basic Usage
 

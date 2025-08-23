@@ -157,6 +157,22 @@ def parse_arguments():
     # transport option
     parser.add_argument("--transport", type=str, choices=["stdio", "sse"], default="sse",
                       help="Transport protocol to use (stdio or sse, default: sse).")
+    # CORS options
+    parser.add_argument(
+        "--cors-origins",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated list of allowed CORS origins. "
+            "If not set, uses KONTXT_CORS_ORIGINS env var; "
+            "otherwise defaults to loopback origins only."
+        ),
+    )
+    parser.add_argument(
+        "--cors-credentials",
+        action="store_true",
+        help="Allow credentials in CORS (disabled by default).",
+    )
     args = parser.parse_args()
     logger.info(f"Arguments parsed: repo_path={args.repo_path}, model={args.gemini_model}, transport={args.transport}")
     return args
@@ -781,17 +797,24 @@ class KontxtMcpServer:
             return {"error": str(e)}
 
     # get the FastAPI app with the SSE endpoint
-    def create_sse_app(self):
+    def create_sse_app(self, allowed_origins: Optional[List[str]] = None, allow_credentials: bool = False):
         """Create a FastAPI app with the SSE endpoint configured"""
         logger.info("Creating FastAPI app for SSE endpoint")
         app = FastAPI(title="Kontxt MCP Server")
         
         # configure CORS to allow connections from various clients
+        default_origins = [
+            "http://127.0.0.1",
+            "http://localhost",
+            "http://127.0.0.1:8080",
+            "http://localhost:8080",
+        ]
+        origins = allowed_origins or default_origins
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
+            allow_origins=origins,
+            allow_credentials=bool(allow_credentials),
+            allow_methods=["GET", "OPTIONS"],
             allow_headers=["*"],
         )
         logger.info("Configured CORS middleware for FastAPI app")
@@ -818,7 +841,7 @@ async def run_stdio_server(server_instance):
     logger.info("Running MCP server with stdio transport...")
     await server_instance.mcp.run_stdio()
 
-async def run_sse_server(server_instance, host, port):
+async def run_sse_server(server_instance, host, port, allowed_origins: Optional[List[str]] = None, allow_credentials: bool = False):
     """Run the MCP server using SSE transport"""
     sse_url = f"http://{host}:{port}/sse"
     logger.info(f"Starting SSE server at: {sse_url}")
@@ -836,6 +859,20 @@ async def run_sse_server(server_instance, host, port):
     
     # get the SSE app from FastMCP
     app = server_instance.mcp.sse_app()
+    # Apply secure CORS policy to the SSE app
+    default_origins = [
+        "http://127.0.0.1",
+        "http://localhost",
+        f"http://{host}:{port}",
+    ]
+    origins = allowed_origins or default_origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=bool(allow_credentials),
+        allow_methods=["GET", "OPTIONS"],
+        allow_headers=["*"],
+    )
     logger.info("Retrieved SSE app from FastMCP")
     
     # run using uvicorn directly with a proper shutdown timeout
@@ -879,12 +916,24 @@ async def main():
     )
 
     # choose between stdio and SSE transport based on arguments
+    # Build CORS origins from CLI/env (defaults to loopback)
+    cors_origins_raw = args.cors_origins or os.getenv("KONTXT_CORS_ORIGINS")
+    allowed_origins: Optional[List[str]] = None
+    if cors_origins_raw:
+        allowed_origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
+
     if args.transport == "stdio":
         logger.info("Using stdio transport as specified...")
         await run_stdio_server(server_instance)
     else:
         logger.info(f"Using SSE transport with host={args.host}, port={args.port}")
-        await run_sse_server(server_instance, args.host, args.port)
+        await run_sse_server(
+            server_instance,
+            args.host,
+            args.port,
+            allowed_origins=allowed_origins,
+            allow_credentials=args.cors_credentials,
+        )
 
 if __name__ == "__main__":
     try:
