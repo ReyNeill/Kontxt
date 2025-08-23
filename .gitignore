@@ -1,6 +1,9 @@
 # Environment variables
 .env
 
+# macos bs
+.DS_Store
+
 # Python virtual environment
 venv/
 
@@ -13,3 +16,6 @@ __pycache__/
 
 # vscode
 .vscode/
+
+# mine
+TODO.md
