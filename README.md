@@ -118,7 +118,8 @@ For this mode, configure your `~/.cursor/mcp.json` file like this:
   - 500000
   - 800000 (default)
   - 1000000
-- `--gemini-model NAME`: Specific Gemini model to use (default: 'gemini-2.0-flash').
+- `--gemini-model NAME`: Specific Gemini model to use (default: `models/gemini-2.5-flash-preview-04-17`).
+- `--tokenizer-model NAME`: Hugging Face tokenizer id for token estimation (default: `google/gemma-7b`; override via `KONTXT_TOKENIZER_MODEL`).
 - `--transport {stdio,sse}`: Transport protocol to use (default: sse).
 - `--host HOST`: Host address for the SSE server (default: 127.0.0.1).
 - `--port PORT`: Port for the SSE server (default: 8080).
@@ -145,6 +146,24 @@ python kontxt_server.py --repo-path /path/to/your/codebase
 
 Notes:
 - Allowed methods: `GET`, `OPTIONS`. Headers: all. Credentials: off unless `--cors-credentials` is set.
+
+## Tokenizer (Gemma) Access & Auto-Recovery
+
+This server uses the `google/gemma-7b` tokenizer to estimate tokens. The model is gated by Google on Hugging Face.
+
+What happens if you don't have access yet:
+- On startup, if the tokenizer cannot be downloaded, the server logs a clear message and auto-opens: https://huggingface.co/google/gemma-7b
+- The server keeps running using a heuristic token estimator (does not crash).
+- It periodically retries loading the tokenizer; once you gain access, it switches automatically (no restart needed).
+
+How to gain access (free, ~2 minutes):
+1) Visit https://huggingface.co/google/gemma-7b and log in (create an account if needed).
+2) Accept Google’s terms on the model page.
+3) If running headless/CI or a container, authenticate the environment: `huggingface-cli login` (or set `HF_TOKEN`).
+
+Configuration:
+- `--tokenizer-model` or `KONTXT_TOKENIZER_MODEL`: use a different HF tokenizer id if desired.
+- `KONTXT_TOKENIZER_RELOAD_INTERVAL` (seconds, default 60): how often the server re-attempts tokenizer loading.
 
 ### Basic Usage
 

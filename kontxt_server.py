@@ -11,6 +11,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from typing import Any, Dict, List, Optional, Union, Tuple
 import aiofiles
+import webbrowser
+import time
 from transformers import AutoTokenizer
 import heapq
 
@@ -41,11 +43,64 @@ logger = logging.getLogger(__name__)
 class TokenTracker:
     """Helper class to track token usage in tools and responses"""
     
-    def __init__(self, threshold: int):
+    def __init__(self, threshold: int, tokenizer_model: Optional[str] = None):
         self.threshold = threshold
         self.reset()
-        # using gemma tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained("google/gemma-7b")
+        # Prefer a configurable, public tokenizer; fall back gracefully if unavailable
+        self.tokenizer = None
+        # Default to Gemma tokenizer; this repo expects Gemma tokenization
+        self.tokenizer_model = tokenizer_model or os.getenv("KONTXT_TOKENIZER_MODEL") or "google/gemma-7b"
+        self._last_reload_attempt = 0.0
+        self._reload_interval_sec = int(os.getenv("KONTXT_TOKENIZER_RELOAD_INTERVAL", "60"))
+        self._opened_help_link = False
+        self._using_heuristic = False
+
+        # Initial load
+        self._try_load_tokenizer(initial=True)
+
+    def _try_load_tokenizer(self, initial: bool = False) -> bool:
+        try:
+            logger.info(f"Initializing tokenizer: {self.tokenizer_model}")
+            self.tokenizer = AutoTokenizer.from_pretrained(self.tokenizer_model)
+            if self._using_heuristic or initial:
+                logger.info(
+                    "Tokenizer '%s' initialized%s. Switching to tokenizer-based estimation.",
+                    self.tokenizer_model,
+                    " (initial)" if initial else "",
+                )
+            self._using_heuristic = False
+            return True
+        except Exception as e:
+            # Provide actionable guidance for Gemma's gated model access
+            self.tokenizer = None
+            self._using_heuristic = True
+            logger.error("Failed to load tokenizer '%s': %s", self.tokenizer_model, e)
+            if ("gemma" in (self.tokenizer_model or "").lower()) and not self._opened_help_link:
+                msg = (
+                    "The tokenizer is gated by Google on Hugging Face. "
+                    "Create a free Hugging Face account and accept Google's terms to access: "
+                    "https://huggingface.co/google/gemma-7b"
+                )
+                logger.error(msg)
+                # Try to open the acceptance page in the user's default browser
+                try:
+                    opened = webbrowser.open_new_tab("https://huggingface.co/google/gemma-7b")
+                    self._opened_help_link = True
+                    if opened:
+                        logger.info("Opened Hugging Face model page in your browser.")
+                    else:
+                        logger.warning("Could not auto-open browser. Please visit the link manually.")
+                except Exception as be:
+                    logger.warning("Auto-open browser failed: %s", be)
+            if not initial:
+                logger.info("Tokenizer still unavailable; using heuristic estimation and will retry later.")
+            return False
+
+    def _maybe_try_reload(self):
+        now = time.time()
+        if self.tokenizer is None and (now - self._last_reload_attempt) >= self._reload_interval_sec:
+            self._last_reload_attempt = now
+            self._try_load_tokenizer(initial=False)
     
     def reset(self):
         """Reset all tracked token counts"""
@@ -59,11 +114,17 @@ class TokenTracker:
         self.response_tokens = 0
     
     def estimate_tokens(self, text: str) -> int:
-        """Token estimation using the Gemma tokenizer (SentencePiece-based)"""
+        """Estimate tokens using configured tokenizer or a heuristic fallback."""
         if not text:
             return 0
-        # tokenizer's encode method to count tokens
-        return len(self.tokenizer.encode(text))
+        # Opportunistically reload if user has just accepted terms/logged in
+        if self.tokenizer is None:
+            self._maybe_try_reload()
+        if self.tokenizer is not None:
+            return len(self.tokenizer.encode(text))
+        # Heuristic: word-and-punctuation chunks as a rough proxy for tokens
+        chunks = re.findall(r"\w+|[^\w\s]", text)
+        return len(chunks)
     
     def track_tool_usage(self, tool_name: str, content: str):
         """Track token usage for a specific tool"""
@@ -151,6 +212,15 @@ def parse_arguments():
     )
     parser.add_argument("--gemini-model", type=str, default='models/gemini-2.5-flash-preview-04-17',
                         help="The specific Gemini model to use (default: 'models/gemini-2.5-flash-preview-04-17').")
+    parser.add_argument(
+        "--tokenizer-model",
+        type=str,
+        default=None,
+        help=(
+            "Hugging Face tokenizer id for token estimation (default via "
+            "KONTXT_TOKENIZER_MODEL or 'gpt2'). Use a public model to avoid gated access."
+        ),
+    )
     # host and port for SSE server
     parser.add_argument("--host", type=str, default="127.0.0.1", help="host for the SSE server (default: 127.0.0.1).")
     parser.add_argument("--port", type=int, default=8080, help="port for the SSE server (default: 8080).")
@@ -266,7 +336,7 @@ def extract_file_content_from_query(query: str) -> Tuple[str, Dict[str, str], Li
 
 # --- main server class ---
 class KontxtMcpServer:
-    def __init__(self, repo_path: Path, gemini_api_key: str, token_threshold: int, gemini_model: str):
+    def __init__(self, repo_path: Path, gemini_api_key: str, token_threshold: int, gemini_model: str, tokenizer_model: Optional[str] = None):
         logger.info(f"Initializing KontxtMcpServer with model={gemini_model}")
         # create a FastMCP server instance
         self.mcp = FastMCP("KontxtServer")
@@ -279,10 +349,13 @@ class KontxtMcpServer:
         self.token_threshold = token_threshold
         self.gemini_model_name = gemini_model
         self.gemini_client: Optional[genai.GenerativeModel] = None
+        self.tokenizer_model = tokenizer_model
         
         # initialize token tracker
-        self.token_tracker = TokenTracker(token_threshold)
-        logger.info(f"Initialized token tracker with threshold of {token_threshold} tokens")
+        self.token_tracker = TokenTracker(token_threshold, tokenizer_model=self.tokenizer_model)
+        logger.info(
+            f"Initialized token tracker with threshold of {token_threshold} tokens (tokenizer={self.token_tracker.tokenizer_model})"
+        )
 
         # define Gemini tool schemas using Gemini types
         logger.info("Defining Gemini tool schemas")
@@ -912,7 +985,8 @@ async def main():
         repo_path=repo_path,
         gemini_api_key=gemini_api_key,
         token_threshold=args.token_threshold,
-        gemini_model=args.gemini_model
+        gemini_model=args.gemini_model,
+        tokenizer_model=args.tokenizer_model or os.getenv("KONTXT_TOKENIZER_MODEL")
     )
 
     # choose between stdio and SSE transport based on arguments
